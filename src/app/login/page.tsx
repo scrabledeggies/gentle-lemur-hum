@@ -39,6 +39,12 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+function toInternalEmail(username: string) {
+  const trimmed = username.trim().toLowerCase();
+  // Avoid double-appending the domain if the user typed the full internal email
+  return trimmed.includes("@") ? trimmed : `${trimmed}@${USERNAME_EMAIL_DOMAIN}`;
+}
+
 export default function LoginPage() {
   const { session, isLoading } = useSession();
   const router = useRouter();
@@ -57,13 +63,14 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setIsSubmitting(true);
-    const email = `${values.username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;
+    const email = toInternalEmail(values.username);
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password: values.password,
     });
 
     if (error) {
+      console.error("Login failed:", error.message);
       toast.error("Invalid username or password");
       setIsSubmitting(false);
       return;
