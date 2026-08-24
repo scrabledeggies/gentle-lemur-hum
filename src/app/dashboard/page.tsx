@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Loader2, Mail } from "lucide-react";
+import { ArrowRight, Loader2, Mail, UserRound } from "lucide-react";
 
 import { useSession } from "@/components/providers/session-provider";
 import { AdminHeader } from "@/components/admin-header";
@@ -49,6 +49,25 @@ export default function DashboardPage() {
             </div>
             <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary">
               Manage relays
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </div>
+          </Link>
+
+          <Link
+            href="/senders"
+            className="group flex flex-col justify-between rounded-3xl border border-border bg-background p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-500"
+          >
+            <div>
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+                <UserRound className="h-6 w-6" />
+              </div>
+              <h3 className="text-base font-semibold">Sender Identities</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Manage "from" names available for outgoing emails.
+              </p>
+            </div>
+            <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary">
+              Manage senders
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </div>
           </Link>

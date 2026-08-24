@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { supabaseAdmin } from "@/integrations/supabase/admin";
+import { isValidApiKey } from "@/lib/api-auth";
 
 interface SendEmailRequestBody {
   to: string;
@@ -40,9 +41,7 @@ async function logEmailAttempt(params: {
 }
 
 export async function POST(req: NextRequest) {
-  const apiKey = req.headers.get("x-api-key");
-
-  if (!apiKey || apiKey !== process.env.EMAIL_API_KEY) {
+  if (!isValidApiKey(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
