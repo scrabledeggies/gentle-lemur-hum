@@ -5,9 +5,12 @@ import { isValidApiKey } from "@/lib/api-auth";
 
 interface SendEmailRequestBody {
   to: string;
-  from: string;
+  from?: string;
   subject: string;
   body: string;
+  sender_id?: string;
+  custom_sender_name?: string;
+  template_id?: string;
 }
 
 interface HealthyRelay {
@@ -20,8 +23,11 @@ interface HealthyRelay {
   sent_today: number;
 }
 
+const DEFAULT_FROM_EMAIL = process.env.DEFAULT_FROM_EMAIL || "noreply@pal.internal";
+
 async function logEmailAttempt(params: {
   relayId: string | null;
+  templateId: string | null;
   to: string;
   subject: string;
   status: "success" | "failed";
@@ -29,6 +35,7 @@ async function logEmailAttempt(params: {
 }) {
   const { error } = await supabaseAdmin.from("email_log").insert({
     relay_id: params.relayId,
+    template_id: params.templateId,
     to: params.to,
     subject: params.subject,
     status: params.status,
@@ -52,11 +59,45 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { to, from, subject, body: emailBody } = body;
+  const { to, from, subject, body: emailBody, sender_id, custom_sender_name, template_id } = body;
 
-  if (!to || !from || !subject || !emailBody) {
+  if (!to || !subject || !emailBody) {
     return NextResponse.json(
-      { error: "Missing required fields: to, from, subject, body" },
+      { error: "Missing required fields: to, subject, body" },
+      { status: 400 },
+    );
+  }
+
+  // Resolve the From header: sender_id > custom_sender_name > from
+  let fromHeader: string;
+
+  if (sender_id) {
+    const { data: sender, error: senderError } = await supabaseAdmin
+      .from("sender_identities")
+      .select("display_name, from_email")
+      .eq("id", sender_id)
+      .maybeSingle();
+
+    if (senderError || !sender) {
+      await logEmailAttempt({
+        relayId: null,
+        templateId: template_id ?? null,
+        to,
+        subject,
+        status: "failed",
+        errorMessage: "Invalid sender_id: sender identity not found",
+      });
+      return NextResponse.json({ error: "Invalid sender_id" }, { status: 400 });
+    }
+
+    fromHeader = `${sender.display_name} <${sender.from_email}>`;
+  } else if (custom_sender_name) {
+    fromHeader = `${custom_sender_name} <${DEFAULT_FROM_EMAIL}>`;
+  } else if (from) {
+    fromHeader = from;
+  } else {
+    return NextResponse.json(
+      { error: "Provide one of: from, sender_id, or custom_sender_name" },
       { status: 400 },
     );
   }
@@ -69,6 +110,7 @@ export async function POST(req: NextRequest) {
     console.error("[email-send] Failed to fetch healthy relay:", relayError.message);
     await logEmailAttempt({
       relayId: null,
+      templateId: template_id ?? null,
       to,
       subject,
       status: "failed",
@@ -82,6 +124,7 @@ export async function POST(req: NextRequest) {
   if (!relay) {
     await logEmailAttempt({
       relayId: null,
+      templateId: template_id ?? null,
       to,
       subject,
       status: "failed",
@@ -103,7 +146,7 @@ export async function POST(req: NextRequest) {
   try {
     await transporter.sendMail({
       to,
-      from,
+      from: fromHeader,
       subject,
       html: emailBody,
     });
@@ -119,6 +162,7 @@ export async function POST(req: NextRequest) {
 
     await logEmailAttempt({
       relayId: relay.id,
+      templateId: template_id ?? null,
       to,
       subject,
       status: "success",
@@ -132,6 +176,7 @@ export async function POST(req: NextRequest) {
 
     await logEmailAttempt({
       relayId: relay.id,
+      templateId: template_id ?? null,
       to,
       subject,
       status: "failed",
