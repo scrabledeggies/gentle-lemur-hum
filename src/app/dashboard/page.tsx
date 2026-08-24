@@ -33,6 +33,8 @@ export default function DashboardPage() {
     );
   }
 
+  const username = session.user.email?.split("@")[0] ?? "admin";
+
   return (
     <div className="min-h-screen bg-muted/30">
       <header className="border-b bg-background">
@@ -45,7 +47,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:inline">
-              {session.user.email}
+              {username}
             </span>
             <Button
               variant="outline"

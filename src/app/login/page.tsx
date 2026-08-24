@@ -28,8 +28,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
+// Supabase auth requires an email under the hood, so usernames are mapped
+// to a fixed internal domain. Users never see or type an email address.
+const USERNAME_EMAIL_DOMAIN = "pal.internal";
+
 const loginSchema = z.object({
-  email: z.string().email({ message: "Enter a valid email address" }),
+  username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 });
 
@@ -42,7 +46,7 @@ export default function LoginPage() {
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { username: "", password: "" },
   });
 
   useEffect(() => {
@@ -53,13 +57,14 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setIsSubmitting(true);
+    const email = `${values.username.trim().toLowerCase()}@${USERNAME_EMAIL_DOMAIN}`;
     const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
+      email,
       password: values.password,
     });
 
     if (error) {
-      toast.error(error.message);
+      toast.error("Invalid username or password");
       setIsSubmitting(false);
       return;
     }
@@ -99,16 +104,16 @@ export default function LoginPage() {
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="email"
+                  name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <FormLabel>Username</FormLabel>
                       <FormControl>
                         <Input
-                          type="email"
-                          placeholder="you@example.com"
+                          type="text"
+                          placeholder="Username"
                           className="h-11 rounded-xl"
-                          autoComplete="email"
+                          autoComplete="username"
                           {...field}
                         />
                       </FormControl>
