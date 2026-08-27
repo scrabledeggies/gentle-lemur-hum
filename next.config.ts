@@ -12,6 +12,20 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  async rewrites() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "(?<subdomain>[^.]+)\\..*",
+          },
+        ],
+        destination: "/router/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
