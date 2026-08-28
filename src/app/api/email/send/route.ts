@@ -22,7 +22,7 @@ interface HealthyRelay {
 }
 
 export async function POST(req: NextRequest) {
-  const authError = requireBearer(req);
+  const authError = await requireBearer(req);
   if (authError) return authError;
 
   let payload: SendEmailBody;
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Pick healthy relay
   const { data: relays, error: rpcError } = await supabaseAdmin.rpc("get_next_healthy_relay");
   if (rpcError) {
     console.error("[email-send] RPC failed:", rpcError.message);
@@ -62,7 +61,6 @@ export async function POST(req: NextRequest) {
   try {
     const info = await transporter.sendMail({ to, from, subject, html: body });
 
-    // Increment usage counter
     await supabaseAdmin
       .from("smtp_relays")
       .update({
@@ -72,7 +70,6 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", relay.id);
 
-    // Log success
     await supabaseAdmin.from("email_log").insert({
       relay_id: relay.id,
       to,

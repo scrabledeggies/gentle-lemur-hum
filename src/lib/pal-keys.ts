@@ -1,25 +1,61 @@
 import { getAdminClient } from "./db-admin";
 
-/** Returns the active PAL API key, creating the table and a 32-char random key if needed. */
-export async function getPalApiKey(): Promise<string | null> {
+interface PalSetup {
+  api_key: string;
+  handshake_secret: string;
+  handshake_used: boolean;
+}
+
+function randomString(length: number): string {
+  const chars =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  return Array.from({ length }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+}
+
+async function getOrCreateSetup(): Promise<PalSetup> {
   const admin = getAdminClient();
-  
-  // Create table if missing
-  const { error: tableErr } = await admin.rpc("create_table_if_not_exists", {
-    table_name: "pal_keys",
-    definition: "id uuid PRIMARY KEY DEFAULT gen_random_uuid(), key text UNIQUE NOT NULL, created_at timestamptz DEFAULT now()",
-  });
-  if (tableErr) {
-    // Fall back to direct table access, table may exist
+
+  const { data, error } = await admin
+    .from("pal_setup")
+    .select("api_key, handshake_secret, handshake_used")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to read pal_setup: ${error.message}`);
   }
 
-  // Fetch existing key
-  const { data, error } = await admin.from("pal_keys").select("key").limit(1).maybeSingle();
-  if (data?.key) return data.key;
+  if (data) return data as PalSetup;
 
-  // Generate new 32-char random key
-  const key = Array.from({ length: 32 }, () => "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"[Math.floor(Math.random() * 62)]).join("");
-  const { error: insertErr } = await admin.from("pal_keys").insert({ key });
-  if (insertErr) throw insertErr;
-  return key;
+  const api_key = randomString(32);
+  const handshake_secret = randomString(20);
+
+  const { data: inserted, error: insertError } = await admin
+    .from("pal_setup")
+    .insert({ api_key, handshake_secret })
+    .select("api_key, handshake_secret, handshake_used")
+    .single();
+
+  if (insertError) {
+    throw new Error(`Failed to create pal_setup: ${insertError.message}`);
+  }
+
+  return inserted as PalSetup;
+}
+
+export async function getPalApiKey(): Promise<string> {
+  const setup = await getOrCreateSetup();
+  return setup.api_key;
+}
+
+export async function getHandshakeSecret(): Promise<string> {
+  const setup = await getOrCreateSetup();
+  return setup.handshake_secret;
+}
+
+/** Returns the real API key if the secret matches, otherwise null. */
+export async function verifyHandshakeSecret(secret: string): Promise<string | null> {
+  const setup = await getOrCreateSetup();
+  if (setup.handshake_secret !== secret) return null;
+  return setup.api_key;
 }

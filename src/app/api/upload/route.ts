@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/admin";
 import { requireBearer } from "@/lib/auth-bearer";
 
 export async function POST(req: NextRequest) {
-  const authError = requireBearer(req);
+  const authError = await requireBearer(req);
   if (authError) return authError;
 
   try {
@@ -22,7 +22,6 @@ export async function POST(req: NextRequest) {
 
     if (uploadError) throw uploadError;
 
-    // Create html_sites row
     const { data: site, error: dbError } = await supabaseAdmin
       .from("html_sites")
       .insert({

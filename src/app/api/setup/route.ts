@@ -12,24 +12,33 @@ const PORTAL_TABLES = [
 ] as const;
 
 export async function POST(req: NextRequest) {
-  const authError = requireBearer(req);
+  const authError = await requireBearer(req);
   if (authError) return authError;
 
   const admin = getAdminClient();
-  const created: string[] = [];
+  const status: Record<string, string> = {};
 
-  // Create bucket if missing
-  const { data: buckets, error: listErr } = await admin.storage.listBuckets();
-  if (!listErr && buckets && !buckets.some((b) => b.name === "portals")) {
-    const { error: bucketErr } = await admin.storage.createBucket("portals", { public: true });
-    if (!bucketErr) created.push("portals");
-  }
-
-  // Create tables via RPC stubs you will manually implement once
   for (const table of PORTAL_TABLES) {
-    const { error } = await admin.rpc(`create_${table}_table_if_not_exists`);
-    if (!error) created.push(table);
+    const { error } = await admin.from(table).select("id").limit(1);
+    status[table] = error ? `missing: ${error.message}` : "ok";
   }
 
-  return NextResponse.json({ created });
+  const { data: buckets, error: listErr } = await admin.storage.listBuckets();
+  if (listErr) {
+    status["portals bucket"] = `error: ${listErr.message}`;
+  } else {
+    const exists = buckets?.some((b) => b.name === "portals");
+    if (exists) {
+      status["portals bucket"] = "already existed";
+    } else {
+      const { error: createErr } = await admin.storage.createBucket("portals", { public: true });
+      status["portals bucket"] = createErr ? `error: ${createErr.message}` : "created";
+    }
+  }
+
+  const created = Object.entries(status)
+    .filter(([, v]) => v === "ok" || v === "created" || v === "already existed")
+    .map(([k]) => k);
+
+  return NextResponse.json({ created, status });
 }

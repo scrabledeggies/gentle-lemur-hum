@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/integrations/supabase/admin";
-import { isValidApiKey } from "@/lib/api-auth";
+import { requireBearer } from "@/lib/auth-bearer";
 
 interface PublicRelay {
   id: string;
@@ -10,9 +10,8 @@ interface PublicRelay {
 }
 
 export async function GET(req: NextRequest) {
-  if (!isValidApiKey(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireBearer(req);
+  if (authError) return authError;
 
   const { data, error } = await supabaseAdmin.rpc("get_next_healthy_relay_public");
 

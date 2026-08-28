@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/integrations/supabase/admin";
-import { isValidApiKey } from "@/lib/api-auth";
+import { requireBearer } from "@/lib/auth-bearer";
 
 interface SyncTemplateBody {
   id?: string;
@@ -10,9 +10,8 @@ interface SyncTemplateBody {
 }
 
 export async function POST(req: NextRequest) {
-  if (!isValidApiKey(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = await requireBearer(req);
+  if (authError) return authError;
 
   let payload: SyncTemplateBody;
   try {
