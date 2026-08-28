@@ -30,6 +30,12 @@ export function AdminHeader() {
           <span className="text-lg font-bold tracking-tight">PAL</span>
         </Link>
         <div className="flex items-center gap-4">
+          <Link
+            href="/connect"
+            className="hidden text-sm font-medium text-primary hover:text-primary/80 sm:inline"
+          >
+            Connect to KC
+          </Link>
           <span className="hidden text-sm text-muted-foreground sm:inline">
             {username}
           </span>

@@ -11,6 +11,7 @@ import {
   Loader2,
   Mail,
   Network,
+  Plug,
   ShieldBan,
   UserRound,
   type LucideIcon,
@@ -25,6 +26,7 @@ interface SectionCard {
   title: string;
   description: string;
   cta: string;
+  featured?: boolean;
 }
 
 const EMAIL_CARDS: SectionCard[] = [
@@ -89,14 +91,24 @@ function CardGrid({ cards }: { cards: SectionCard[] }) {
         <Link
           key={card.href}
           href={card.href}
-          className="group flex flex-col justify-between rounded-3xl border border-border bg-background p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-500"
+          className={`group flex flex-col justify-between rounded-3xl border border-border bg-background p-6 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md animate-in fade-in slide-in-from-bottom-4 duration-500 ${
+            card.featured ? "ring-1 ring-primary/20" : ""
+          }`}
         >
           <div>
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-accent-foreground">
+            <div
+              className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${
+                card.featured
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-accent text-accent-foreground"
+              }`}
+            >
               <card.icon className="h-6 w-6" />
             </div>
             <h3 className="text-base font-semibold">{card.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{card.description}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {card.description}
+            </p>
           </div>
           <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary">
             {card.cta}
@@ -134,6 +146,22 @@ export default function DashboardPage() {
         <h2 className="mb-6 text-xl font-semibold">Dashboard</h2>
 
         <p className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          Setup
+        </p>
+        <CardGrid
+          cards={[
+            {
+              href: "/connect",
+              icon: Plug,
+              title: "Connect to KC",
+              description: "Generate a handshake code and link PAL to KittyConsole.",
+              cta: "Start setup",
+              featured: true,
+            },
+          ]}
+        />
+
+        <p className="mb-3 mt-10 text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Email
         </p>
         <CardGrid cards={EMAIL_CARDS} />

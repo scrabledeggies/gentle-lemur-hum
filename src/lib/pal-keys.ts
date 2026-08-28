@@ -56,6 +56,27 @@ export async function getHandshakeSecret(): Promise<string> {
 }
 
 /**
+ * Force-rotate to a brand-new handshake code (e.g. when the admin wants to
+ * reconnect KC). Returns the new code.
+ */
+export async function rotateHandshakeSecret(): Promise<string> {
+  const setup = await getOrCreateSetup();
+  const newSecret = randomString(20);
+  const admin = getAdminClient();
+
+  const { error } = await admin
+    .from("pal_setup")
+    .update({ handshake_secret: newSecret, handshake_used: false })
+    .eq("id", setup.id);
+
+  if (error) {
+    throw new Error(`Failed to rotate handshake code: ${error.message}`);
+  }
+
+  return newSecret;
+}
+
+/**
  * Single-use exchange: on a match, immediately rotate to a fresh code so the
  * old one can never be replayed, then return the long-lived API key.
  */
