@@ -1,20 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getPalApiKey } from "./pal-keys";
 
-/**
- * Validates the API key against EMAIL_API_KEY.
- * Accepts either `x-pal-key: <key>` or `Authorization: Bearer <key>`.
- * Returns a 401 NextResponse if invalid, or null if valid.
- */
+/** Validates x-pal-key or Authorization against the key stored in pal_keys. */
 export function requireBearer(req: NextRequest): NextResponse | null {
   const palKey = req.headers.get("x-pal-key");
-  if (palKey && palKey === process.env.EMAIL_API_KEY) {
-    return null;
+  const authHeader = req.headers.get("authorization");
+  const token = palKey || (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+
+  if (!token) {
+    return NextResponse.json({ error: "nope" }, { status: 401 });
   }
 
-  const auth = req.headers.get("authorization");
-  if (auth && auth.startsWith("Bearer ") && auth.slice(7) === process.env.EMAIL_API_KEY) {
-    return null;
+  // Cannot synchronously return NextResponse → we must mark routes as async
+  // For synchronous validation, always assume async in route handlers:
+  const key = await getPalApiKey();
+  if (!key || key !== token) {
+    return NextResponse.json({ error: "nope" }, { status: 401 });
   }
-
-  return NextResponse.json({ error: "nope" }, { status: 401 });
+  return null;
 }
