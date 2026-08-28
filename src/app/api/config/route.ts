@@ -12,8 +12,13 @@ export async function GET() {
       sms: `${baseUrl}/sms`,
       voice: `${baseUrl}/voice`,
       freestyle: `${baseUrl}/freestyle`,
-      portals_categories: `${baseUrl}/api/portals/categories`,
-      portals_sessions: `${baseUrl}/api/portals/sessions`,
+      email_send: `${baseUrl}/email/send`,
+      relays_next_healthy: `${baseUrl}/relays/next-healthy`,
+      senders: `${baseUrl}/senders`,
+      templates_sync: `${baseUrl}/templates/sync`,
+      portals_categories: `${baseUrl}/portals/categories`,
+      portals_sessions: `${baseUrl}/portals/sessions`,
+      portals_upload: `${baseUrl}/portals/upload`,
     },
   });
 }

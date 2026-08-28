@@ -3,9 +3,21 @@ import { NextRequest, NextResponse } from "next/server";
 const SUPABASE_URL = "https://etjkljrlffjolrsuwlrn.supabase.co";
 
 export async function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+
+  // Never intercept API routes, static assets, or Next.js internals
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/static/") ||
+    pathname === "/favicon.ico"
+  ) {
+    return NextResponse.next();
+  }
+
   const host = req.headers.get("host") || "";
 
-  // Never intercept the Vercel deployment domain or local dev.
+  // Never intercept the Vercel deployment domain or local dev
   if (host.endsWith(".vercel.app") || host.startsWith("localhost")) {
     return NextResponse.next();
   }
