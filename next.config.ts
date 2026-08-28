@@ -15,7 +15,10 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/health", destination: "/api/health" },
-      { source: "/outreach", destination: "/api/email/send" },
+      { source: "/outreach", destination: "/api/dispatcher" },
+      { source: "/sms", destination: "/api/dispatcher" },
+      { source: "/voice", destination: "/api/dispatcher" },
+      { source: "/freestyle", destination: "/api/dispatcher" },
       { source: "/portals/upload", destination: "/api/upload" },
       { source: "/portals/router", destination: "/router" },
     ];

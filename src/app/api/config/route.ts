@@ -6,9 +6,14 @@ export async function GET() {
   const baseUrl = vercelUrl ? `https://${vercelUrl}` : "http://localhost:3000";
 
   return NextResponse.json({
-    baseUrl,
-    health: "/health",
-    outreach: "/outreach",
-    portals: "/portals",
+    endpoints: {
+      health: `${baseUrl}/health`,
+      outreach: `${baseUrl}/outreach`,
+      sms: `${baseUrl}/sms`,
+      voice: `${baseUrl}/voice`,
+      freestyle: `${baseUrl}/freestyle`,
+      portals_categories: `${baseUrl}/api/portals/categories`,
+      portals_sessions: `${baseUrl}/api/portals/sessions`,
+    },
   });
 }

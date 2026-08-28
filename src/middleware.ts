@@ -37,6 +37,8 @@ export async function middleware(req: NextRequest) {
     if (Array.isArray(matches) && matches.length > 0) {
       const url = req.nextUrl.clone();
       url.pathname = "/router";
+      url.search = "";
+      url.searchParams.set("s", parts[0]);
       return NextResponse.rewrite(url);
     }
   } catch {

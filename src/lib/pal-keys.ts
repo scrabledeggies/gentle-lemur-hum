@@ -1,6 +1,7 @@
 import { getAdminClient } from "./db-admin";
 
 interface PalSetup {
+  id: string;
   api_key: string;
   handshake_secret: string;
   handshake_used: boolean;
@@ -17,7 +18,7 @@ async function getOrCreateSetup(): Promise<PalSetup> {
 
   const { data, error } = await admin
     .from("pal_setup")
-    .select("api_key, handshake_secret, handshake_used")
+    .select("id, api_key, handshake_secret, handshake_used")
     .limit(1)
     .maybeSingle();
 
@@ -33,7 +34,7 @@ async function getOrCreateSetup(): Promise<PalSetup> {
   const { data: inserted, error: insertError } = await admin
     .from("pal_setup")
     .insert({ api_key, handshake_secret })
-    .select("api_key, handshake_secret, handshake_used")
+    .select("id, api_key, handshake_secret, handshake_used")
     .single();
 
   if (insertError) {
@@ -48,14 +49,29 @@ export async function getPalApiKey(): Promise<string> {
   return setup.api_key;
 }
 
+/** The current one-time code the builder pastes into KC. */
 export async function getHandshakeSecret(): Promise<string> {
   const setup = await getOrCreateSetup();
   return setup.handshake_secret;
 }
 
-/** Returns the real API key if the secret matches, otherwise null. */
+/**
+ * Single-use exchange: on a match, immediately rotate to a fresh code so the
+ * old one can never be replayed, then return the long-lived API key.
+ */
 export async function verifyHandshakeSecret(secret: string): Promise<string | null> {
   const setup = await getOrCreateSetup();
   if (setup.handshake_secret !== secret) return null;
+
+  const admin = getAdminClient();
+  const { error } = await admin
+    .from("pal_setup")
+    .update({ handshake_secret: randomString(20), handshake_used: false })
+    .eq("id", setup.id);
+
+  if (error) {
+    throw new Error(`Failed to rotate handshake code: ${error.message}`);
+  }
+
   return setup.api_key;
 }
