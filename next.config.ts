@@ -14,16 +14,10 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "(?<subdomain>[^.]+)\\..*",
-          },
-        ],
-        destination: "/router/:path*",
-      },
+      { source: "/health", destination: "/api/health" },
+      { source: "/outreach", destination: "/api/email/send" },
+      { source: "/portals/upload", destination: "/api/upload" },
+      { source: "/portals/router", destination: "/router" },
     ];
   },
 };
