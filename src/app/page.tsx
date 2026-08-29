@@ -1,23 +1,12 @@
-"use client";
-
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
-import { useSession } from "@/components/providers/session-provider";
+import { MadeWithDyad } from "@/components/made-with-dyad";
 
 export default function Home() {
-  const { session, isLoading } = useSession();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading) {
-      router.replace(session ? "/dashboard" : "/login");
-    }
-  }, [isLoading, session, router]);
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    <div className="grid grid-rows-[1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <main className="flex flex-col gap-8 row-start-1 items-center sm:items-start">
+        <h1>Blank page</h1>
+      </main>
+      <MadeWithDyad />
     </div>
   );
 }
