@@ -11,12 +11,14 @@ function assertValidServiceRoleKey(): string {
   }
   if (SERVICE_ROLE_KEY.startsWith("sb_publishable")) {
     throw new Error(
-      "WRONG KEY: You pasted a Publishable Key into SUPABASE_SERVICE_ROLE_KEY. In Supabase → Project Settings → API, copy the key labeled service_role (secret). It is a long random string with dots, NOT something starting with 'sb_publishable'."
+      "WRONG KEY: You pasted a Publishable Key into SUPABASE_SERVICE_ROLE_KEY. In Supabase → Project Settings → API, copy the key labeled service_role (secret) — it starts with 'sb_secret_' or 'eyJ', NOT 'sb_publishable'."
     );
   }
-  if (!SERVICE_ROLE_KEY.startsWith("eyJ")) {
+  const isLegacyJwtFormat = SERVICE_ROLE_KEY.startsWith("eyJ");
+  const isNewSecretFormat = SERVICE_ROLE_KEY.startsWith("sb_secret_");
+  if (!isLegacyJwtFormat && !isNewSecretFormat) {
     throw new Error(
-      "WRONG KEY: Your SUPABASE_SERVICE_ROLE_KEY does not look like a valid Supabase API key. In Supabase → Project Settings → API, copy the service_role secret key. It should start with 'eyJ'."
+      "WRONG KEY: Your SUPABASE_SERVICE_ROLE_KEY does not look like a valid Supabase API key. In Supabase → Project Settings → API, copy the service_role secret key. It should start with 'sb_secret_' (new projects) or 'eyJ' (older projects)."
     );
   }
   return SERVICE_ROLE_KEY;
