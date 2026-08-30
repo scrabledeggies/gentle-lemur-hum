@@ -5,13 +5,14 @@ interface PalSetup {
   api_key: string;
   handshake_secret: string;
   handshake_used: boolean;
+  test_handshake_secret: string | null;
   kc_connected: boolean;
   kc_connected_at: string | null;
   last_ping_at: string | null;
 }
 
 const SETUP_COLUMNS =
-  "id, api_key, handshake_secret, handshake_used, kc_connected, kc_connected_at, last_ping_at";
+  "id, api_key, handshake_secret, handshake_used, test_handshake_secret, kc_connected, kc_connected_at, last_ping_at";
 
 function randomString(length: number): string {
   const chars =
@@ -22,9 +23,12 @@ function randomString(length: number): string {
 async function getOrCreateSetup(): Promise<PalSetup> {
   const admin = getAdminClient();
 
+  // Order deterministically so we always resolve to the same row, even if a
+  // race condition ever produces more than one.
   const { data, error } = await admin
     .from("pal_setup")
     .select(SETUP_COLUMNS)
+    .order("created_at", { ascending: true })
     .limit(1)
     .maybeSingle();
 
@@ -36,10 +40,11 @@ async function getOrCreateSetup(): Promise<PalSetup> {
 
   const api_key = randomString(32);
   const handshake_secret = randomString(20);
+  const test_handshake_secret = randomString(20);
 
   const { data: inserted, error: insertError } = await admin
     .from("pal_setup")
-    .insert({ api_key, handshake_secret })
+    .insert({ api_key, handshake_secret, test_handshake_secret })
     .select(SETUP_COLUMNS)
     .single();
 
@@ -83,30 +88,73 @@ export async function rotateHandshakeSecret(): Promise<string> {
 }
 
 /**
- * Single-use exchange: on a match, immediately rotate to a fresh code so the
- * old one can never be replayed, mark PAL as connected to KC, then return
- * the long-lived API key.
+ * Generates a one-time code for PAL's own "Connection test" tool. This lives
+ * in a completely separate slot from the real KC-facing handshake code, so
+ * running a self-test can never invalidate a code that's already been
+ * copied into KC.
  */
-export async function verifyHandshakeSecret(secret: string): Promise<string | null> {
+export async function generateTestHandshakeCode(): Promise<string> {
   const setup = await getOrCreateSetup();
-  if (setup.handshake_secret !== secret) return null;
-
+  const newSecret = randomString(20);
   const admin = getAdminClient();
+
   const { error } = await admin
     .from("pal_setup")
-    .update({
-      handshake_secret: randomString(20),
-      handshake_used: false,
-      kc_connected: true,
-      kc_connected_at: new Date().toISOString(),
-    })
+    .update({ test_handshake_secret: newSecret })
     .eq("id", setup.id);
 
   if (error) {
-    throw new Error(`Failed to rotate handshake code: ${error.message}`);
+    throw new Error(`Failed to generate test handshake code: ${error.message}`);
   }
 
-  return setup.api_key;
+  return newSecret;
+}
+
+/**
+ * Single-use exchange: on a match against the real KC-facing code, rotate to
+ * a fresh code so the old one can never be replayed, mark PAL as connected
+ * to KC, then return the long-lived API key.
+ *
+ * Also accepts PAL's own isolated test code (from generateTestHandshakeCode)
+ * so the self-test tool can prove the handshake endpoint works without ever
+ * touching the real KC connection state.
+ */
+export async function verifyHandshakeSecret(secret: string): Promise<string | null> {
+  const setup = await getOrCreateSetup();
+  const admin = getAdminClient();
+
+  if (setup.handshake_secret === secret) {
+    const { error } = await admin
+      .from("pal_setup")
+      .update({
+        handshake_secret: randomString(20),
+        handshake_used: false,
+        kc_connected: true,
+        kc_connected_at: new Date().toISOString(),
+      })
+      .eq("id", setup.id);
+
+    if (error) {
+      throw new Error(`Failed to rotate handshake code: ${error.message}`);
+    }
+
+    return setup.api_key;
+  }
+
+  if (setup.test_handshake_secret && setup.test_handshake_secret === secret) {
+    const { error } = await admin
+      .from("pal_setup")
+      .update({ test_handshake_secret: randomString(20) })
+      .eq("id", setup.id);
+
+    if (error) {
+      throw new Error(`Failed to rotate test handshake code: ${error.message}`);
+    }
+
+    return setup.api_key;
+  }
+
+  return null;
 }
 
 /**

@@ -19,7 +19,7 @@ interface Step {
 
 const INITIAL_STEPS: Step[] = [
   { id: "config", label: "Fetch /api/config", status: "idle" },
-  { id: "generate", label: "Generate a handshake code", status: "idle" },
+  { id: "generate", label: "Generate a test-only handshake code", status: "idle" },
   { id: "exchange", label: "Exchange code for an API key", status: "idle" },
   { id: "health", label: "Call /health with the key", status: "idle" },
   { id: "portals", label: "Call /api/portals/categories with the key", status: "idle" },
@@ -53,11 +53,13 @@ export function ConnectionTestCard() {
       return;
     }
 
-    // Step 2: generate handshake code (admin-authenticated)
+    // Step 2: generate a TEST-ONLY handshake code — this is isolated from
+    // the real code shown to KC, so running this test never invalidates
+    // whatever code KC is mid-way through redeeming.
     updateStep("generate", "running");
     let code: string;
     try {
-      const res = await fetch("/api/admin/setup-info", { method: "POST" });
+      const res = await fetch("/api/admin/self-test-handshake", { method: "POST" });
       const json = await res.json();
       if (!res.ok || !json.handshake_code) throw new Error(json.error ?? "No code returned");
       code = json.handshake_code;
@@ -65,11 +67,11 @@ export function ConnectionTestCard() {
     } catch (err) {
       updateStep("generate", "error", err instanceof Error ? err.message : "Failed");
       setIsRunning(false);
-      toast.error("Connection test failed generating a handshake code");
+      toast.error("Connection test failed generating a test handshake code");
       return;
     }
 
-    // Step 3: exchange code for key (exactly what KC does)
+    // Step 3: exchange code for key (same endpoint KC uses)
     updateStep("exchange", "running");
     let apiKey: string;
     try {
@@ -131,7 +133,8 @@ export function ConnectionTestCard() {
         <div>
           <p className="text-sm font-medium">Connection test</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Runs PAL through the exact steps KC performs, end to end.
+            Runs PAL through the exact steps KC performs, using an isolated
+            test code that never affects KC&apos;s real connection.
           </p>
         </div>
         <Button

@@ -6,6 +6,7 @@ import { requirePalKey } from "@/lib/require-pal-key";
 interface OutreachEnvelope {
   module: string;
   action: string;
+  dry_run?: boolean;
   agent_id?: string;
   freestyle?: Record<string, unknown>;
   payload?: {
@@ -13,6 +14,7 @@ interface OutreachEnvelope {
     to?: string;
     subject?: string;
     html?: string;
+    dry_run?: boolean;
   };
 }
 
@@ -37,6 +39,13 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  // Diagnostic/dry-run ping: echo back success without touching the
+  // database or sending any real email.
+  if (body.action === "ping" || body.dry_run === true || body.payload?.dry_run === true) {
+    console.log("[outreach] Dry-run ping received", body);
+    return NextResponse.json({ ok: true, dry_run: true, module: "outreach" });
   }
 
   if (body.action !== "send") {
