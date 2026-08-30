@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/require-user";
+import { requireAdmin } from "@/lib/require-admin";
 import { getAdminClient } from "@/lib/db-admin";
 import { getConnectionStatus } from "@/lib/pal-keys";
 
@@ -22,8 +22,8 @@ interface EmailLogEntry {
 }
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser(req);
-  if (!user) {
+  const authorized = await requireAdmin(req);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

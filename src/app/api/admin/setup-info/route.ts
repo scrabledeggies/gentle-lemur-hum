@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireUser } from "@/lib/require-user";
+import { requireAdmin } from "@/lib/require-admin";
 import { getHandshakeSecret, rotateHandshakeSecret } from "@/lib/pal-keys";
 
 export async function GET(req: NextRequest) {
-  const user = await requireUser(req);
-  if (!user) {
+  const authorized = await requireAdmin(req);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const user = await requireUser(req);
-  if (!user) {
+  const authorized = await requireAdmin(req);
+  if (!authorized) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

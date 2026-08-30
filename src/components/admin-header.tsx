@@ -4,8 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSession } from "@/components/providers/session-provider";
-import { supabase } from "@/integrations/supabase/client";
+import { useAdminAuth } from "@/components/providers/admin-auth-provider";
 import { cn } from "@/lib/utils";
 
 const TABS = [
@@ -14,12 +13,12 @@ const TABS = [
 ];
 
 export function AdminHeader() {
-  const { user } = useSession();
+  const { logout } = useAdminAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await logout();
     router.replace("/login");
   };
 
@@ -34,22 +33,15 @@ export function AdminHeader() {
             <span className="text-lg font-bold tracking-tight">PAL Admin</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            {user?.email && (
-              <span className="hidden text-sm text-muted-foreground sm:inline">
-                {user.email}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="rounded-full"
-              onClick={handleSignOut}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sign out
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full"
+            onClick={handleSignOut}
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign out
+          </Button>
         </div>
 
         <nav className="mb-3 flex w-fit items-center gap-1 rounded-full bg-muted p-1">

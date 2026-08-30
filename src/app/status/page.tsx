@@ -14,8 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/components/providers/session-provider";
+import { useAdminAuth } from "@/components/providers/admin-auth-provider";
 import { AdminHeader } from "@/components/admin-header";
 import { IosCard } from "@/components/ios-card";
 import { StatusPill } from "@/components/status-pill";
@@ -54,26 +53,21 @@ interface SystemStatusResponse {
 }
 
 export default function StatusPage() {
-  const { session, isLoading } = useSession();
+  const { isAuthenticated, isLoading } = useAdminAuth();
   const router = useRouter();
 
   const [data, setData] = useState<SystemStatusResponse | null>(null);
   const [isFetching, setIsFetching] = useState(true);
 
   useEffect(() => {
-    if (!isLoading && !session) router.replace("/login");
-  }, [isLoading, session, router]);
+    if (!isLoading && !isAuthenticated) router.replace("/login");
+  }, [isLoading, isAuthenticated, router]);
 
   const fetchStatus = useCallback(async (showToast = false) => {
     setIsFetching(true);
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
 
     try {
-      const res = await fetch("/api/admin/system-status", {
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
+      const res = await fetch("/api/admin/system-status");
       const json = await res.json();
       if (res.ok) {
         setData(json);
@@ -88,13 +82,13 @@ export default function StatusPage() {
   }, []);
 
   useEffect(() => {
-    if (!session) return;
+    if (!isAuthenticated) return;
     fetchStatus();
     const interval = setInterval(() => fetchStatus(), 30000);
     return () => clearInterval(interval);
-  }, [session, fetchStatus]);
+  }, [isAuthenticated, fetchStatus]);
 
-  if (isLoading || !session) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

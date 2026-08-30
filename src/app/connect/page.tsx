@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/components/providers/session-provider";
+import { useAdminAuth } from "@/components/providers/admin-auth-provider";
 import { AdminHeader } from "@/components/admin-header";
 import { IosCard } from "@/components/ios-card";
 import { StatusPill } from "@/components/status-pill";
@@ -23,7 +22,7 @@ interface KcStatus {
 }
 
 export default function ConnectPage() {
-  const { session, isLoading } = useSession();
+  const { isAuthenticated, isLoading } = useAdminAuth();
   const router = useRouter();
 
   const [url, setUrl] = useState("");
@@ -35,31 +34,27 @@ export default function ConnectPage() {
   const [kcStatus, setKcStatus] = useState<KcStatus | null>(null);
   const [databaseOk, setDatabaseOk] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (!isLoading && !session) router.replace("/login");
-  }, [isLoading, session, router]);
+  const hasInitializedUrl = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (!isLoading && !isAuthenticated) router.replace("/login");
+  }, [isLoading, isAuthenticated, router]);
+
+  // Initialize the URL field exactly once so later re-renders never clobber
+  // whatever the admin has typed in.
+  useEffect(() => {
+    if (!hasInitializedUrl.current && typeof window !== "undefined") {
       setUrl(window.location.origin);
+      hasInitializedUrl.current = true;
     }
-    if (session) {
-      fetchSetupInfo();
-      fetchSystemGlance();
-    }
-  }, [session]);
+  }, []);
 
   const fetchSetupInfo = async () => {
     setIsLoadingSetup(true);
     setSetupError(null);
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
 
     try {
-      const res = await fetch("/api/admin/setup-info", {
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
+      const res = await fetch("/api/admin/setup-info");
       const json = await res.json();
       if (res.ok) {
         setHandshakeCode(json.handshake_code);
@@ -77,14 +72,8 @@ export default function ConnectPage() {
   };
 
   const fetchSystemGlance = async () => {
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
-
     try {
-      const res = await fetch("/api/admin/system-status", {
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
+      const res = await fetch("/api/admin/system-status");
       const json = await res.json();
       if (res.ok) {
         setKcStatus(json.kc);
@@ -95,18 +84,24 @@ export default function ConnectPage() {
     }
   };
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    fetchSetupInfo();
+    fetchSystemGlance();
+
+    // Poll so the connection pill flips to "Connected" without needing a
+    // manual refresh once KC completes the handshake.
+    const interval = setInterval(fetchSystemGlance, 8000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
+
   const generateCode = async () => {
     setIsGenerating(true);
     setSetupError(null);
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
 
     try {
-      const res = await fetch("/api/admin/setup-info", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
+      const res = await fetch("/api/admin/setup-info", { method: "POST" });
       const json = await res.json();
       if (res.ok) {
         setHandshakeCode(json.handshake_code);
@@ -129,7 +124,7 @@ export default function ConnectPage() {
     toast.success("Copied to clipboard");
   };
 
-  if (isLoading || !session) {
+  if (isLoading || !isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
