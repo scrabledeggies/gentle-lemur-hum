@@ -9,10 +9,17 @@ export async function GET(req: NextRequest) {
 
   const rawKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+  const deploymentInfo = {
+    vercelEnv: process.env.VERCEL_ENV ?? "unknown",
+    commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? "unknown (enable 'Automatically expose System Environment Variables' in Vercel Project Settings to see this)",
+    deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? "unknown",
+  };
+
   if (!rawKey) {
     return NextResponse.json({
       exists: false,
       message: "SUPABASE_SERVICE_ROLE_KEY is not set on this deployment at all.",
+      ...deploymentInfo,
     });
   }
 
@@ -31,6 +38,6 @@ export async function GET(req: NextRequest) {
     looksLegacyJwt,
     looksNewSecret,
     looksPublishable,
-    vercelEnv: process.env.VERCEL_ENV ?? "unknown",
+    ...deploymentInfo,
   });
 }
