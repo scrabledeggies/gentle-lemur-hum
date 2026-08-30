@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink, Stethoscope } from "lucide-react";
+import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink, Stethoscope, PlugZap } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -24,6 +24,13 @@ interface DiagnosticsResult {
   vercelEnv?: string;
 }
 
+interface TestConnectionResult {
+  success: boolean;
+  stage?: string;
+  message: string;
+  code?: string | null;
+}
+
 export default function ConnectPage() {
   const { session, isLoading } = useSession();
   const router = useRouter();
@@ -36,6 +43,9 @@ export default function ConnectPage() {
 
   const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
+
+  const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !session) router.replace("/login");
@@ -126,6 +136,30 @@ export default function ConnectPage() {
     setIsRunningDiagnostics(false);
   };
 
+  const runTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    const {
+      data: { session: current },
+    } = await supabase.auth.getSession();
+
+    try {
+      const res = await fetch("/api/admin/test-connection", {
+        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
+      });
+      const json = await res.json();
+      setTestResult(json);
+      if (json.success) {
+        toast.success("Connection to Supabase works!");
+      } else {
+        toast.error("Connection failed — see details below");
+      }
+    } catch {
+      toast.error("Failed to run connection test");
+    }
+    setIsTesting(false);
+  };
+
   const copy = async (text: string) => {
     await navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
@@ -197,23 +231,52 @@ export default function ConnectPage() {
         <div className="space-y-6">
           {isKeyError && (
             <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
-              <div className="mb-3 flex items-center justify-between">
-                <label className="text-sm font-medium">Diagnose the key problem</label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="rounded-xl"
-                  onClick={runDiagnostics}
-                  disabled={isRunningDiagnostics}
-                >
-                  {isRunningDiagnostics ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Stethoscope className="mr-2 h-4 w-4" />
-                  )}
-                  Run diagnostics
-                </Button>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium">Test the real connection</label>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={runDiagnostics}
+                    disabled={isRunningDiagnostics}
+                  >
+                    {isRunningDiagnostics ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Stethoscope className="mr-2 h-4 w-4" />
+                    )}
+                    Check format
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="rounded-xl"
+                    onClick={runTestConnection}
+                    disabled={isTesting}
+                  >
+                    {isTesting ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <PlugZap className="mr-2 h-4 w-4" />
+                    )}
+                    Test connection
+                  </Button>
+                </div>
               </div>
+
+              {testResult && (
+                <div
+                  className={`mb-3 rounded-xl p-4 font-mono text-xs ${
+                    testResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
+                  }`}
+                >
+                  <p className="font-semibold">
+                    {testResult.success ? "✅ Success" : `❌ Failed at: ${testResult.stage}`}
+                  </p>
+                  <p className="mt-1 break-all">{testResult.message}</p>
+                  {testResult.code && <p className="mt-1">Supabase error code: {testResult.code}</p>}
+                </div>
+              )}
 
               {diagnostics && (
                 <div className="space-y-2 rounded-xl bg-muted p-4 font-mono text-xs">
