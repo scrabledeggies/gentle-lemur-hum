@@ -7,6 +7,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/components/providers/session-provider";
+import { IosCard } from "@/components/ios-card";
 
 export default function LoginPage() {
   const { session, isLoading } = useSession();
@@ -32,7 +33,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ffccf1] text-foreground shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-foreground shadow-soft">
             <span className="text-xl font-bold">P</span>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">PAL Admin</h1>
@@ -41,7 +42,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
+        <IosCard>
           <Auth
             supabaseClient={supabase}
             providers={[]}
@@ -50,24 +51,24 @@ export default function LoginPage() {
               variables: {
                 default: {
                   colors: {
-                    brand: "#ffccf1",
-                    brandAccent: "#ffb3e6",
+                    brand: "#D88B9E",
+                    brandAccent: "#C97C90",
                   },
                   borderWidths: {
                     buttonBorderWidth: "1px",
                     inputBorderWidth: "1px",
                   },
                   radii: {
-                    borderRadiusButton: "12px",
-                    buttonBorderRadius: "12px",
-                    inputBorderRadius: "12px",
+                    borderRadiusButton: "20px",
+                    buttonBorderRadius: "20px",
+                    inputBorderRadius: "16px",
                   },
                 },
               },
             }}
             theme="light"
           />
-        </div>
+        </IosCard>
       </div>
     </div>
   );

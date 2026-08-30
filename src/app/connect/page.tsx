@@ -2,33 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink, Stethoscope, PlugZap } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
+import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/components/providers/session-provider";
 import { AdminHeader } from "@/components/admin-header";
+import { IosCard } from "@/components/ios-card";
+import { StatusPill } from "@/components/status-pill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Link from "next/link";
 
-interface DiagnosticsResult {
-  exists: boolean;
-  message?: string;
-  length?: number;
-  prefixPreview?: string;
-  hasWhitespaceOrQuotes?: boolean;
-  looksLegacyJwt?: boolean;
-  looksNewSecret?: boolean;
-  looksPublishable?: boolean;
-  vercelEnv?: string;
-}
-
-interface TestConnectionResult {
-  success: boolean;
-  stage?: string;
-  message: string;
-  code?: string | null;
+interface KcStatus {
+  connected: boolean;
+  connectedAt: string | null;
+  lastPingAt: string | null;
 }
 
 export default function ConnectPage() {
@@ -41,11 +32,8 @@ export default function ConnectPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
 
-  const [diagnostics, setDiagnostics] = useState<DiagnosticsResult | null>(null);
-  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false);
-
-  const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
-  const [isTesting, setIsTesting] = useState(false);
+  const [kcStatus, setKcStatus] = useState<KcStatus | null>(null);
+  const [databaseOk, setDatabaseOk] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (!isLoading && !session) router.replace("/login");
@@ -55,7 +43,10 @@ export default function ConnectPage() {
     if (typeof window !== "undefined") {
       setUrl(window.location.origin);
     }
-    if (session) fetchSetupInfo();
+    if (session) {
+      fetchSetupInfo();
+      fetchSystemGlance();
+    }
   }, [session]);
 
   const fetchSetupInfo = async () => {
@@ -83,6 +74,25 @@ export default function ConnectPage() {
       toast.error(msg);
     }
     setIsLoadingSetup(false);
+  };
+
+  const fetchSystemGlance = async () => {
+    const {
+      data: { session: current },
+    } = await supabase.auth.getSession();
+
+    try {
+      const res = await fetch("/api/admin/system-status", {
+        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
+      });
+      const json = await res.json();
+      if (res.ok) {
+        setKcStatus(json.kc);
+        setDatabaseOk(json.database.ok);
+      }
+    } catch {
+      // Non-critical glance — full details live on /status.
+    }
   };
 
   const generateCode = async () => {
@@ -114,52 +124,6 @@ export default function ConnectPage() {
     setIsGenerating(false);
   };
 
-  const runDiagnostics = async () => {
-    setIsRunningDiagnostics(true);
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
-
-    try {
-      const res = await fetch("/api/admin/diagnostics", {
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
-      const json = await res.json();
-      if (res.ok) {
-        setDiagnostics(json);
-      } else {
-        toast.error(json.error ?? "Failed to run diagnostics");
-      }
-    } catch {
-      toast.error("Failed to run diagnostics");
-    }
-    setIsRunningDiagnostics(false);
-  };
-
-  const runTestConnection = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-    const {
-      data: { session: current },
-    } = await supabase.auth.getSession();
-
-    try {
-      const res = await fetch("/api/admin/test-connection", {
-        headers: { Authorization: `Bearer ${current?.access_token ?? ""}` },
-      });
-      const json = await res.json();
-      setTestResult(json);
-      if (json.success) {
-        toast.success("Connection to Supabase works!");
-      } else {
-        toast.error("Connection failed — see details below");
-      }
-    } catch {
-      toast.error("Failed to run connection test");
-    }
-    setIsTesting(false);
-  };
-
   const copy = async (text: string) => {
     await navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
@@ -185,7 +149,7 @@ export default function ConnectPage() {
       <AdminHeader />
       <main className="mx-auto max-w-2xl px-6 py-12">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ffccf1] text-foreground shadow-lg">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary text-foreground shadow-soft">
             <ShieldCheck className="h-7 w-7" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Connect PAL to KC</h1>
@@ -194,136 +158,57 @@ export default function ConnectPage() {
           </p>
         </div>
 
-        {isKeyError && (
-          <Alert
-            variant="destructive"
-            className="mb-6 rounded-2xl border-red-200 bg-red-50"
-          >
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-            <AlertTitle className="text-red-800">Server misconfiguration detected</AlertTitle>
-            <AlertDescription className="mt-2 text-sm text-red-700">
-              <p className="mb-2">{setupError}</p>
-              <ol className="ml-4 list-decimal space-y-1 text-sm">
-                <li>Go to <strong>Supabase → Project Settings → API</strong>.</li>
-                <li>Under <strong>Project API keys</strong>, copy the <strong>service_role</strong> (secret) key.</li>
-                <li>
-                  Go to{" "}
-                  <strong>Vercel → Project Settings → Environment Variables</strong>.
-                </li>
-                <li>
-                  Make sure a variable named <code className="rounded bg-red-100 px-1 py-0.5 font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code>{" "}
-                  exists, is enabled for <strong>Production</strong>, and has the <strong>service_role</strong> key as its value.
-                </li>
-                <li>Redeploy your project for the change to take effect.</li>
-              </ol>
-              <div className="mt-3 flex gap-2">
-                <a
-                  href="https://supabase.com/dashboard/project/_/settings/api"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-red-800 underline underline-offset-2 hover:text-red-900"
-                >
-                  Open Supabase API settings <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
+        {databaseOk === false && (
+          <Alert variant="destructive" className="mb-6 rounded-[24px]">
+            <AlertTriangle className="h-5 w-5" />
+            <AlertTitle>Server misconfigured</AlertTitle>
+            <AlertDescription className="mt-1 flex items-center justify-between gap-3">
+              <span className="text-sm">PAL can&apos;t reach its database right now.</span>
+              <Link href="/status" className="inline-flex items-center gap-1 text-sm font-medium underline underline-offset-2">
+                Open System Status <ExternalLink className="h-3 w-3" />
+              </Link>
             </AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-6">
-          {isKeyError && (
-            <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <label className="text-sm font-medium">Test the real connection</label>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl"
-                    onClick={runDiagnostics}
-                    disabled={isRunningDiagnostics}
-                  >
-                    {isRunningDiagnostics ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Stethoscope className="mr-2 h-4 w-4" />
-                    )}
-                    Check format
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="rounded-xl"
-                    onClick={runTestConnection}
-                    disabled={isTesting}
-                  >
-                    {isTesting ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <PlugZap className="mr-2 h-4 w-4" />
-                    )}
-                    Test connection
-                  </Button>
-                </div>
+          <IosCard>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">KittyConsole connection</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {kcStatus?.connected
+                    ? kcStatus.lastPingAt
+                      ? `Last active ${formatDistanceToNow(new Date(kcStatus.lastPingAt))} ago`
+                      : "Handshake complete, waiting for first request"
+                    : "KC hasn't connected yet"}
+                </p>
               </div>
-
-              {testResult && (
-                <div
-                  className={`mb-3 rounded-xl p-4 font-mono text-xs ${
-                    testResult.success ? "bg-green-50 text-green-800" : "bg-red-50 text-red-800"
-                  }`}
-                >
-                  <p className="font-semibold">
-                    {testResult.success ? "✅ Success" : `❌ Failed at: ${testResult.stage}`}
-                  </p>
-                  <p className="mt-1 break-all">{testResult.message}</p>
-                  {testResult.code && <p className="mt-1">Supabase error code: {testResult.code}</p>}
-                </div>
-              )}
-
-              {diagnostics && (
-                <div className="space-y-2 rounded-xl bg-muted p-4 font-mono text-xs">
-                  {!diagnostics.exists ? (
-                    <p className="text-red-600">
-                      No SUPABASE_SERVICE_ROLE_KEY found on this deployment at all. It was
-                      never saved, or was added to the wrong environment (e.g. Preview
-                      instead of Production).
-                    </p>
-                  ) : (
-                    <>
-                      <p>Deployment environment: <strong>{diagnostics.vercelEnv}</strong></p>
-                      <p>Key length: <strong>{diagnostics.length}</strong> characters</p>
-                      <p>Starts with: <strong>{diagnostics.prefixPreview}</strong></p>
-                      <p>
-                        Has extra spaces/quotes:{" "}
-                        <strong>{diagnostics.hasWhitespaceOrQuotes ? "YES — this is likely the bug" : "No"}</strong>
-                      </p>
-                      <p>Looks like legacy service key (eyJ...): <strong>{diagnostics.looksLegacyJwt ? "Yes" : "No"}</strong></p>
-                      <p>Looks like new secret key (sb_secret_...): <strong>{diagnostics.looksNewSecret ? "Yes" : "No"}</strong></p>
-                      <p>
-                        Looks like a Publishable key (wrong key pasted):{" "}
-                        <strong className={diagnostics.looksPublishable ? "text-red-600" : ""}>
-                          {diagnostics.looksPublishable ? "YES — this is the bug" : "No"}
-                        </strong>
-                      </p>
-                    </>
-                  )}
-                </div>
-              )}
+              <StatusPill
+                tone={kcStatus?.connected ? "success" : "neutral"}
+                label={kcStatus?.connected ? "Connected" : "Not connected"}
+              />
             </div>
-          )}
+            <Link
+              href="/status"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              View full system status <ExternalLink className="h-3 w-3" />
+            </Link>
+          </IosCard>
 
-          <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
+          <IosCard>
             <label className="mb-2 block text-sm font-medium">PAL Public URL</label>
             <div className="flex gap-2">
               <Input
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://your-app.vercel.app"
-                className="h-11 rounded-xl font-mono text-sm"
+                className="h-11 rounded-2xl font-mono text-sm"
               />
               <Button
                 variant="outline"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-full"
                 onClick={() => copy(url)}
               >
                 <Copy className="h-4 w-4" />
@@ -334,21 +219,20 @@ export default function ConnectPage() {
                 <AlertTriangle className="h-4 w-4 text-amber-600" />
                 <AlertTitle className="text-amber-800">Local preview detected</AlertTitle>
                 <AlertDescription className="text-sm text-amber-700">
-                  KC cannot reach localhost. Paste your live Vercel URL here
-                  (e.g., <code className="rounded bg-amber-100 px-1 font-mono text-xs">https://pal-admin-2m6kl9jil-lol-5f60.vercel.app</code>),
-                  then copy it and use it in KC.
+                  KC cannot reach localhost. Paste your live, stable production URL here
+                  instead, then copy it and use it in KC.
                 </AlertDescription>
               </Alert>
             )}
-          </div>
+          </IosCard>
 
-          <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
+          <IosCard>
             <div className="mb-3 flex items-center justify-between">
               <label className="text-sm font-medium">Handshake code</label>
               <Button
                 variant="outline"
                 size="sm"
-                className="rounded-xl"
+                className="rounded-full"
                 onClick={generateCode}
                 disabled={isGenerating || isKeyError}
               >
@@ -366,11 +250,11 @@ export default function ConnectPage() {
                 <Input
                   value={handshakeCode}
                   readOnly
-                  className="h-11 rounded-xl bg-muted font-mono text-sm tracking-wider"
+                  className="h-11 rounded-2xl bg-muted font-mono text-sm tracking-wider"
                 />
                 <Button
                   variant="outline"
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-full"
                   onClick={() => copy(handshakeCode)}
                 >
                   <Copy className="h-4 w-4" />
@@ -385,19 +269,18 @@ export default function ConnectPage() {
                 )}
               </p>
             )}
-          </div>
+          </IosCard>
 
-          <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
+          <IosCard>
             <h3 className="mb-2 text-sm font-medium">Next steps</h3>
             <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
-              <li>
-                Copy the <strong>live</strong> PAL Public URL (not localhost) above.
-              </li>
+              <li>Copy the live PAL Public URL (not localhost) above.</li>
               <li>Click Generate to create a handshake code, then copy it.</li>
               <li>Open KC Admin → PAL Connection.</li>
               <li>Paste the URL and code, then click Connect.</li>
+              <li>Come back here — the connection pill above will flip to &quot;Connected&quot;.</li>
             </ol>
-          </div>
+          </IosCard>
         </div>
       </main>
     </div>
