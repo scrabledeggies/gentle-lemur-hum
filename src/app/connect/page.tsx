@@ -178,6 +178,8 @@ export default function ConnectPage() {
     setupError?.includes("Missing SUPABASE_SERVICE_ROLE_KEY") ||
     setupError?.includes("Failed to read pal_setup");
 
+  const isLocalhost = url.includes("localhost") || url.includes("127.0.0.1");
+
   return (
     <div className="min-h-screen bg-muted/30">
       <AdminHeader />
@@ -315,8 +317,9 @@ export default function ConnectPage() {
             <div className="flex gap-2">
               <Input
                 value={url}
-                readOnly
-                className="h-11 rounded-xl bg-muted font-mono text-sm"
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://your-app.vercel.app"
+                className="h-11 rounded-xl font-mono text-sm"
               />
               <Button
                 variant="outline"
@@ -326,6 +329,17 @@ export default function ConnectPage() {
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
+            {isLocalhost && (
+              <Alert className="mt-3 rounded-2xl border-amber-200 bg-amber-50">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTitle className="text-amber-800">Local preview detected</AlertTitle>
+                <AlertDescription className="text-sm text-amber-700">
+                  KC cannot reach localhost. Paste your live Vercel URL here
+                  (e.g., <code className="rounded bg-amber-100 px-1 font-mono text-xs">https://pal-admin-2m6kl9jil-lol-5f60.vercel.app</code>),
+                  then copy it and use it in KC.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
@@ -376,7 +390,9 @@ export default function ConnectPage() {
           <div className="rounded-3xl border border-border bg-background p-6 shadow-sm">
             <h3 className="mb-2 text-sm font-medium">Next steps</h3>
             <ol className="list-inside list-decimal space-y-1 text-sm text-muted-foreground">
-              <li>Copy the PAL Public URL above.</li>
+              <li>
+                Copy the <strong>live</strong> PAL Public URL (not localhost) above.
+              </li>
               <li>Click Generate to create a handshake code, then copy it.</li>
               <li>Open KC Admin → PAL Connection.</li>
               <li>Paste the URL and code, then click Connect.</li>
