@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { Copy, Loader2, RefreshCw, ShieldCheck, AlertTriangle, ExternalLink } from "lucide-react";
@@ -10,10 +10,13 @@ import { useAdminAuth } from "@/components/providers/admin-auth-provider";
 import { AdminHeader } from "@/components/admin-header";
 import { IosCard } from "@/components/ios-card";
 import { StatusPill } from "@/components/status-pill";
+import { ConnectionTestCard } from "@/components/connection-test-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import Link from "next/link";
+
+const PRODUCTION_URL = "https://pal-admin.vercel.app";
 
 interface KcStatus {
   connected: boolean;
@@ -25,7 +28,7 @@ export default function ConnectPage() {
   const { isAuthenticated, isLoading } = useAdminAuth();
   const router = useRouter();
 
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(PRODUCTION_URL);
   const [handshakeCode, setHandshakeCode] = useState<string | null>(null);
   const [isLoadingSetup, setIsLoadingSetup] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -34,20 +37,9 @@ export default function ConnectPage() {
   const [kcStatus, setKcStatus] = useState<KcStatus | null>(null);
   const [databaseOk, setDatabaseOk] = useState<boolean | null>(null);
 
-  const hasInitializedUrl = useRef(false);
-
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.replace("/login");
   }, [isLoading, isAuthenticated, router]);
-
-  // Initialize the URL field exactly once so later re-renders never clobber
-  // whatever the admin has typed in.
-  useEffect(() => {
-    if (!hasInitializedUrl.current && typeof window !== "undefined") {
-      setUrl(window.location.origin);
-      hasInitializedUrl.current = true;
-    }
-  }, []);
 
   const fetchSetupInfo = async () => {
     setIsLoadingSetup(true);
@@ -265,6 +257,8 @@ export default function ConnectPage() {
               </p>
             )}
           </IosCard>
+
+          <ConnectionTestCard />
 
           <IosCard>
             <h3 className="mb-2 text-sm font-medium">Next steps</h3>
